@@ -396,6 +396,26 @@
     return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   }
 
+  // ESPN reports scheduled-game times in ET. Each event also carries a precise
+  // UTC timestamp (g.date), so for not-yet-started games we format that into
+  // the viewer's own local timezone (toLocaleString uses the browser's zone,
+  // and timeZoneName:"short" labels it, e.g. "Fri 7:00 PM PST").
+  function fmtLocalTime(iso) {
+    if (!iso) return "";
+    try {
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return "";
+      return d.toLocaleString([], {
+        weekday: "short",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZoneName: "short"
+      });
+    } catch (_) {
+      return "";
+    }
+  }
+
   function gameRowHTML(g) {
     const cls = g.count >= 3 ? "hot" : g.count >= 1 ? "hit" : "";
     const live = g.state === "in" ? `<span class="live">● LIVE</span>` : "";
@@ -403,6 +423,10 @@
       (g.state === "in" || g.state === "post") && g.away.score !== ""
         ? ` ${esc(g.away.score)}–${esc(g.home.score)}`
         : "";
+    // For upcoming games show the local-time kickoff; for in-progress/final
+    // keep ESPN's status text ("3rd Qtr", "Final", ...).
+    const localTime = g.state === "pre" ? fmtLocalTime(g.date) : "";
+    const detail = localTime || g.detail;
     const names = g.players.length
       ? `<div class="names">⭐ ${g.players.map(esc).join(", ")}</div>`
       : "";
@@ -412,7 +436,7 @@
           <span>${esc(g.away.abbr || g.away.name)} @ ${esc(g.home.abbr || g.home.name)}</span>
           <span class="badge">${g.count}</span>
         </div>
-        <div class="meta">${live} ${esc(g.detail)}${score}</div>
+        <div class="meta">${live} ${esc(detail)}${score}</div>
         ${names}
       </li>`;
   }
