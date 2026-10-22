@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Fantasy Game Finder (NBA)",
+  "version": "0.1.0",
+  "description": "Highlights tonight's NBA games by how many players from your fantasy roster (ESPN, Fantrax, Yahoo) are playing in them.",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "https://site.api.espn.com/*",
+    "https://fantasy.espn.com/*",
+    "https://fantrax.com/*",
+    "https://*.fantrax.com/*",
+    "https://*.fantasysports.yahoo.com/*",
+    "https://sports.yahoo.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Toggle Fantasy Game Finder"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://fantasy.espn.com/*",
+        "https://fantrax.com/*",
+        "https://*.fantrax.com/*",
+        "https://*.fantasysports.yahoo.com/*",
+        "https://sports.yahoo.com/fantasy/*"
+      ],
+      "js": ["teams.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
