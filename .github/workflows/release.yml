@@ -1,0 +1,50 @@
+name: release
+
+# Publish a GitHub Release (with a zipped, installable build of the extension)
+# on every push to main.
+on:
+  push:
+    branches: [main]
+
+# Needed so the built-in GITHUB_TOKEN can create releases/tags.
+permissions:
+  contents: write
+
+# If several pushes land quickly, let each finish rather than cancelling.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read manifest version
+        id: meta
+        run: echo "version=$(node -p "require('./manifest.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Build extension zip
+        run: |
+          zip -q fantasy-game-finder.zip manifest.json background.js content.js teams.js README.md
+          echo "Packaged:" && unzip -l fantasy-game-finder.zip
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Pass the commit message through the environment (not inline) to
+          # avoid shell injection from untrusted commit text.
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          TAG="v${{ steps.meta.outputs.version }}-${{ github.run_number }}"
+          {
+            echo "Automated release for commit ${GITHUB_SHA}."
+            echo
+            echo "$COMMIT_MSG"
+          } > notes.md
+          gh release create "$TAG" fantasy-game-finder.zip \
+            --title "$TAG" \
+            --notes-file notes.md \
+            --target "$GITHUB_SHA"
