@@ -16,7 +16,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Toggle Fantasy Game Finder"
+    "default_title": "Show / hide Fantasy Game Finder"
   },
   "content_scripts": [
     {

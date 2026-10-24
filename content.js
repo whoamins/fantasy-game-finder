@@ -372,11 +372,12 @@
     rosters: {}, // sport -> [{name, team}]
     locked: {}, // sport -> true (user hand-edited; don't auto-overwrite until nav)
     editing: false,
+    hidden: false, // whole overlay hidden via the toolbar icon (persisted)
     status: ""
   };
 
   const roster = () => state.rosters[state.sport] || [];
-  const uiObj = () => ({ collapsed: state.collapsed, sport: state.sport, auto: state.auto });
+  const uiObj = () => ({ collapsed: state.collapsed, sport: state.sport, auto: state.auto, hidden: state.hidden });
 
   function buildUI() {
     host = document.createElement("div");
@@ -389,6 +390,7 @@
     wrap.className = "wrap";
     root.appendChild(wrap);
     document.documentElement.appendChild(host);
+    host.style.display = state.hidden ? "none" : "";
     render();
   }
 
@@ -664,9 +666,14 @@
   // ---------------------------------------------------------------------------
   // Boot
   // ---------------------------------------------------------------------------
+  // Toolbar icon click (relayed from the background service worker) shows/hides
+  // the whole overlay, and the choice persists across reloads and navigation.
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg && msg.type === "toggleOverlay") {
-      host.style.display = host.style.display === "none" ? "" : "none";
+      if (!host) return; // click arrived before the UI was built
+      state.hidden = !state.hidden;
+      host.style.display = state.hidden ? "none" : "";
+      store.set({ [UI_KEY]: uiObj() });
     }
   });
 
@@ -697,6 +704,7 @@
     }
     if (data[UI_KEY]) {
       state.collapsed = !!data[UI_KEY].collapsed;
+      state.hidden = !!data[UI_KEY].hidden;
       if (SPORTS[data[UI_KEY].sport]) state.sport = data[UI_KEY].sport;
       if (typeof data[UI_KEY].auto === "boolean") state.auto = data[UI_KEY].auto;
     }

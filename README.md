@@ -51,7 +51,8 @@ is sent anywhere except the public ESPN scoreboard request.
 2. Turn on **Developer mode** (top-right).
 3. Click **Load unpacked** and select this `fantasy-game-finder` folder.
 4. Open your fantasy roster page on ESPN, Fantrax, or Yahoo. The dialog appears
-   bottom-left. Click the toolbar icon to hide/show it.
+   bottom-left. Click the extension's **toolbar icon** to show/hide the whole
+   overlay — that choice is remembered across reloads and navigation.
 
 ## Usage
 
