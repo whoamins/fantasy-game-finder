@@ -1,8 +1,11 @@
 // background.js (MV3 service worker)
-// Fetches the scoreboard for the requested sport (NBA / NFL / NHL) from ESPN's
-// public API and returns a trimmed list of games. Kept deliberately "dumb":
-// it knows nothing about rosters or team normalization -- the content script
-// does the matching per sport.
+// 1) Fetches the scoreboard for a sport from ESPN's public API (for the content
+//    script's matching).
+// 2) Runs a daily alarm that counts how many of your rostered players are in
+//    games today and shows a "set your lineups" notification.
+//
+// teams.js gives us fghNormalizeTeam / fghHasMap / FGH_SPORTS for the counting.
+importScripts("teams.js");
 
 const ESPN_PATH = {
   nba: "basketball/nba",
@@ -90,3 +93,108 @@ chrome.action.onClicked.addListener((tab) => {
     chrome.tabs.sendMessage(tab.id, { type: "toggleOverlay" }).catch(() => {});
   }
 });
+
+// ---------------------------------------------------------------------------
+// Daily "set your lineups" reminder
+// ---------------------------------------------------------------------------
+const ALARM = "fgh-daily-reminder";
+const UI_KEY = "fgh_ui"; // { remind, remindTime, ... } (shared with content.js)
+const rosterKey = (sport) => `fgh_roster_${sport}`;
+
+function storageGet(keys) {
+  return new Promise((r) => chrome.storage.local.get(keys, r));
+}
+
+// Next occurrence (local time) of "HH:MM"; tomorrow if already past today.
+function nextFire(hhmm) {
+  const [h, m] = String(hhmm || "10:00").split(":").map((n) => parseInt(n, 10));
+  const t = new Date();
+  t.setHours(isNaN(h) ? 10 : h, isNaN(m) ? 0 : m, 0, 0);
+  if (t.getTime() <= Date.now()) t.setDate(t.getDate() + 1);
+  return t.getTime();
+}
+
+// Does a scraped roster team refer to this side of a game? Mirrors the
+// content script's matching: canonical-code equality for mapped sports, and
+// abbr/location/name comparison for map-less sports (NCAAF).
+function sideMatch(sport, teamStr, side) {
+  if (globalThis.fghHasMap(sport)) {
+    const code = globalThis.fghNormalizeTeam(sport, teamStr);
+    if (!code) return false;
+    const h =
+      globalThis.fghNormalizeTeam(sport, side.abbr) ||
+      globalThis.fghNormalizeTeam(sport, side.name);
+    return code === h;
+  }
+  const nk = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const t = nk(teamStr);
+  if (!t) return false;
+  if (t === nk(side.abbr) || t === nk(side.loc) || t === nk(side.short) || t === nk(side.name)) return true;
+  if (t.length >= 4) {
+    const d = nk(side.name);
+    const l = nk(side.loc);
+    if ((d && d.includes(t)) || (l && l.includes(t))) return true;
+  }
+  return false;
+}
+
+async function countForSport(sport) {
+  const data = await storageGet(rosterKey(sport));
+  const roster = data[rosterKey(sport)] || [];
+  if (!roster.length) return 0;
+  const { games } = await getGames(sport, false);
+  let count = 0;
+  for (const p of roster) {
+    if (games.some((g) => sideMatch(sport, p.team, g.home) || sideMatch(sport, p.team, g.away))) count++;
+  }
+  return count;
+}
+
+async function runReminder() {
+  const ui = (await storageGet(UI_KEY))[UI_KEY] || {};
+  if (ui.remind === false) return; // disabled
+  let total = 0;
+  const parts = [];
+  for (const sport of globalThis.FGH_SPORTS) {
+    try {
+      const c = await countForSport(sport);
+      if (c > 0) {
+        total += c;
+        parts.push(`${sport.toUpperCase()} ${c}`);
+      }
+    } catch (_) {
+      /* ignore one sport's fetch failure */
+    }
+  }
+  if (total <= 0) return; // nothing playing today -> stay quiet
+  chrome.notifications.create(`fgh-${Date.now()}`, {
+    type: "basic",
+    iconUrl: "icon128.png",
+    title: "Set your fantasy lineups",
+    message: `You have ${total} player${total > 1 ? "s" : ""} in games today (${parts.join(", ")}).`,
+    priority: 1
+  });
+}
+
+async function scheduleReminder() {
+  await chrome.alarms.clear(ALARM);
+  const ui = (await storageGet(UI_KEY))[UI_KEY] || {};
+  if (ui.remind === false) return; // opt-out
+  chrome.alarms.create(ALARM, { when: nextFire(ui.remindTime), periodInMinutes: 24 * 60 });
+}
+
+chrome.alarms.onAlarm.addListener((a) => {
+  if (a && a.name === ALARM) runReminder();
+});
+
+// Reschedule when the user changes reminder settings in the overlay.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes[UI_KEY]) {
+    const o = changes[UI_KEY].oldValue || {};
+    const n = changes[UI_KEY].newValue || {};
+    if (o.remind !== n.remind || o.remindTime !== n.remindTime) scheduleReminder();
+  }
+});
+
+chrome.runtime.onInstalled.addListener(scheduleReminder);
+chrome.runtime.onStartup.addListener(scheduleReminder);

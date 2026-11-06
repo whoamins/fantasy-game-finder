@@ -1,9 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Fantasy Game Finder (NBA)",
-  "version": "0.1.0",
-  "description": "Highlights tonight's NBA games by how many players from your fantasy roster (ESPN, Fantrax, Yahoo) are playing in them.",
-  "permissions": ["storage", "activeTab"],
+  "name": "Fantasy Game Finder",
+  "version": "1.0.0",
+  "description": "Highlights today's NBA/NFL/NHL (and Fantrax NCAAF) games by how many of your fantasy players (ESPN, Fantrax, Yahoo) are in them, with an optional daily lineup reminder.",
+  "permissions": ["storage", "activeTab", "notifications", "alarms"],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "host_permissions": [
     "https://site.api.espn.com/*",
     "https://fantasy.espn.com/*",
@@ -16,7 +21,12 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Show / hide Fantasy Game Finder"
+    "default_title": "Show / hide Fantasy Game Finder",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
   },
   "content_scripts": [
     {

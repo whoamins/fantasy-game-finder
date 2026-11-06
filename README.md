@@ -12,6 +12,8 @@ is Fantrax-only, so that tab appears only on Fantrax pages.
 - 🟩 **green** = 1–2 of your players in that game
 - 🟨 **gold** = 3+ of your players (must-watch)
 - `●` LIVE indicator and live score when a game is in progress
+- 🔔 Optional **daily reminder** notification ("You have N players in games
+  today — set your lineups"), at a time you choose
 
 Works on **ESPN**, **Fantrax**, and **Yahoo** fantasy pages.
 
@@ -65,6 +67,10 @@ is sent anywhere except the public ESPN scoreboard request.
 3. Collapse the dialog with the ▾ button; your choice, selected sport, and the
    ⚡ auto-scan setting are remembered.
 4. Click ⟳ to refresh scores/games, or **Rescan now** to re-read the roster.
+5. **Daily reminder:** the 🔔 button toggles a once-a-day notification telling
+   you how many of your players are in games that day; set the time with the
+   adjacent time field. It stays quiet on days when none of your players play.
+   (Uses the `notifications` + `alarms` permissions and a background alarm.)
 
 ## Tuning the scraper
 
@@ -85,7 +91,8 @@ the sites change. If a scan comes back short:
 | File | Purpose |
 |------|---------|
 | `manifest.json` | MV3 manifest, permissions, content-script matches |
-| `background.js` | Service worker: fetches + caches the ESPN scoreboard |
+| `background.js` | Service worker: ESPN scoreboard fetch/cache + daily reminder alarm/notification |
+| `icon16/48/128.png` | Toolbar + notification icon |
 | `content.js` | The bottom-left dialog, roster scraping, and matching |
 | `teams.js` | Per-sport team normalization (NBA/NFL/NHL; GS/GSW, JAX/JAC, etc.) |
 

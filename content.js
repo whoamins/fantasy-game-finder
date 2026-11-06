@@ -352,6 +352,11 @@
     .btn.primary { background:#2f7d5b; border-color:#2f7d5b; color:#eafff4; }
     .btn.primary:hover { filter:brightness(1.08); }
     .status { padding: 8px 10px 4px; font-size: 11px; color: #8696a7; }
+    .remind { padding: 2px 10px 6px; font-size: 11px; color: #9fb0c3; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .remind input[type="time"] {
+      background:#0d1116; color:#e9edf1; border:1px solid #2a3340; border-radius:6px;
+      padding:2px 4px; font: 11px -apple-system, "Segoe UI", sans-serif;
+    }
     .editor { padding: 8px; display:none; }
     .editor.open { display:block; }
     .editor textarea {
@@ -373,11 +378,20 @@
     locked: {}, // sport -> true (user hand-edited; don't auto-overwrite until nav)
     editing: false,
     hidden: false, // whole overlay hidden via the toolbar icon (persisted)
+    remind: true, // daily "set your lineups" notification
+    remindTime: "10:00", // local HH:MM
     status: ""
   };
 
   const roster = () => state.rosters[state.sport] || [];
-  const uiObj = () => ({ collapsed: state.collapsed, sport: state.sport, auto: state.auto, hidden: state.hidden });
+  const uiObj = () => ({
+    collapsed: state.collapsed,
+    sport: state.sport,
+    auto: state.auto,
+    hidden: state.hidden,
+    remind: state.remind,
+    remindTime: state.remindTime
+  });
 
   function buildUI() {
     host = document.createElement("div");
@@ -471,12 +485,14 @@
         <span class="title">${meta.emoji} Fantasy Game Finder</span>
         <span class="chip">${roster().length} players</span>
         <button class="iconbtn ${state.auto ? "on" : ""}" data-act="auto" title="Auto-scan: ${state.auto ? "on" : "off"}">⚡</button>
+        <button class="iconbtn ${state.remind ? "on" : ""}" data-act="remind" title="Daily lineup reminder: ${state.remind ? "on" : "off"}">🔔</button>
         <button class="iconbtn" data-act="refresh" title="Refresh games">⟳</button>
         <button class="iconbtn" data-act="toggle" title="Collapse / expand">${state.collapsed ? "▴" : "▾"}</button>
       </div>
       <div class="tabs">${tabs}</div>
       <div class="body">
         <div class="status">${esc(state.status || `${totalMatched} ${meta.label} game(s) with your players`)}</div>
+        ${state.remind ? `<div class="remind">🔔 Remind me to set lineups at <input type="time" class="remind-time" value="${esc(state.remindTime)}"> daily</div>` : ""}
         ${list}
         <div class="editor ${state.editing ? "open" : ""}">
           <div class="hint">One player per line: <code>Name, TEAM</code> (e.g. <code>Josh Allen, BUF</code>). Saving pins this roster so auto-scan won't overwrite it until you navigate.</div>
@@ -501,6 +517,14 @@
         switchSport(el.getAttribute("data-sport"));
       })
     );
+    const timeInput = wrap.querySelector(".remind-time");
+    if (timeInput) {
+      timeInput.addEventListener("click", (e) => e.stopPropagation());
+      timeInput.addEventListener("change", async (e) => {
+        state.remindTime = e.target.value || "10:00";
+        await store.set({ [UI_KEY]: uiObj() }); // background reschedules on change
+      });
+    }
   }
 
   async function switchSport(sport) {
@@ -527,6 +551,13 @@
       await store.set({ [UI_KEY]: uiObj() });
       render();
       if (state.auto) scheduleScan(200);
+    } else if (act === "remind") {
+      state.remind = !state.remind;
+      await store.set({ [UI_KEY]: uiObj() }); // background (re)schedules on change
+      state.status = state.remind
+        ? `Daily lineup reminder on (${state.remindTime}).`
+        : "Daily lineup reminder off.";
+      render();
     } else if (act === "refresh") {
       await loadGames(true);
     } else if (act === "scan") {
@@ -707,6 +738,8 @@
       state.hidden = !!data[UI_KEY].hidden;
       if (SPORTS[data[UI_KEY].sport]) state.sport = data[UI_KEY].sport;
       if (typeof data[UI_KEY].auto === "boolean") state.auto = data[UI_KEY].auto;
+      if (typeof data[UI_KEY].remind === "boolean") state.remind = data[UI_KEY].remind;
+      if (data[UI_KEY].remindTime) state.remindTime = data[UI_KEY].remindTime;
     }
     // Don't leave a Fantrax-only sport (NCAAF) selected on a non-Fantrax page.
     if (!availableSports().includes(state.sport)) state.sport = "nba";
